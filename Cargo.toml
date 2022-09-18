@@ -1,5 +1,5 @@
 [package]
-name = "internet-of-coffee"
+name = "coffee"
 version = "0.1.0"
 edition = "2021"
 

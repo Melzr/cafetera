@@ -1,3 +1,6 @@
+use coffee::cafetera::Cafetera;
+
 fn main() {
-    println!("Hello, world!");
+    let mut cafetera = Cafetera::new();
+    cafetera.run();
 }
