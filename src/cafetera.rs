@@ -1,17 +1,19 @@
-use std::thread;
+use std::sync::{Arc, Mutex, Condvar};
+use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 const G: i32 = 100;
 const C: i32 = 100;
 const L: i32 = 100;
 const E: i32 = 100;
-const N: i32 = 6;
+const N: usize = 6;
 
 pub struct Cafetera {
     granos: i32,
     cafe: i32,
     leche: i32,
     espuma: i32,
+    dispensadores: Arc<(Mutex<Vec<bool>>, Condvar)>
 }
 
 impl Cafetera {
@@ -21,6 +23,7 @@ impl Cafetera {
             cafe: 0,
             leche: L,
             espuma: 0,
+            dispensadores: Arc::new((Mutex::new(vec![true; N]), Condvar::new()))
         }
     }
 
@@ -58,13 +61,33 @@ impl Cafetera {
         self.print_info();
     }
 
-    fn servir(&mut self) {
-        thread::sleep(Duration::from_millis(5000));
-        self.cafe -= 10;
-        self.espuma -= 10;
-        // agua
-        println!("Café servido!");
-        self.print_info();
+    fn servir(&mut self, n: usize) -> JoinHandle<()> {
+        let dispensadores = self.dispensadores.clone();
+
+        thread::spawn(move || {
+            let (lock, cvar) = &*dispensadores;
+
+            let mut state = cvar.wait_while(lock.lock().unwrap(), |disp| {
+                println!("Esperando dispensador");
+                !disp.iter().any(|&x| x)
+            }).unwrap();
+            let mut i = 1;
+            println!("{:?}", state);
+            for ing in (*state).iter_mut() {
+                if (*ing) {
+                    println!("Entre en dispensador {}", i);
+                    *ing = false;
+                    break;
+                }
+                i+=1;
+            }
+            drop(state);
+            thread::sleep(Duration::from_millis(5000));
+            println!("Café servido! {}", n);
+            let mut state = lock.lock().unwrap();
+            state[i-1] = true;
+            cvar.notify_one();
+        })
     }
 
     fn print_info(&self) {
@@ -72,9 +95,11 @@ impl Cafetera {
     }
 
     pub fn run(&mut self) {
-        loop {
+        let mut handlers = Vec::new();
+        let mut i = 0;
+        for i in 0..12 {
             if self.cafe >= 10 && self.espuma >= 10 {
-                self.servir();
+                handlers.push(self.servir(i));
             } else {
                 if self.granos >= 10 {
                     self.llenar_cafe();
@@ -87,6 +112,9 @@ impl Cafetera {
                     self.llenar_leche();
                 }
             }
+        }
+        for h in handlers {
+            h.join().unwrap();
         }
     }
 
