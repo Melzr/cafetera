@@ -58,10 +58,11 @@ impl Cafetera {
                 let cantidad = std::cmp::min(C, contenedor_granos);
                 println!("Reponiendo cafe molido");
                 thread::sleep(Duration::from_millis(TIEMPO_CAFE));
-                state.cafe_molido = cantidad;
+                state.cafe_molido += cantidad;
                 contenedor_granos -= cantidad;
                 println!("[INFO] Cafe: {}, granos: {}", state.cafe_molido, contenedor_granos);
                 state.en_uso = false;
+                cvar.notify_one();
             }
             if contenedor_granos == 0 {
                 println!("Reponiendo granos");
@@ -79,16 +80,17 @@ impl Cafetera {
             {
                 let (lock, cvar) = &*contenedor_espuma;
                 let mut state = cvar.wait_while(lock.lock().unwrap(), |cont| {
-                    !(cont.espuma == 0 && !cont.en_uso)
+                    cont.espuma != 0 || cont.en_uso
                 }).unwrap();
                 state.en_uso = true;
                 let cantidad = std::cmp::min(E, contenedor_leche);
                 println!("Reponiendo espuma");
                 thread::sleep(Duration::from_millis(TIEMPO_ESPUMA));
-                state.espuma = cantidad;
+                state.espuma += cantidad;
                 contenedor_leche -= cantidad;
                 state.en_uso = false;
                 println!("[INFO] Espuma: {}, leche: {}", state.espuma, contenedor_leche);
+                cvar.notify_one();
             }
             if contenedor_leche == 0 {
                 println!("Reponiendo leche");
@@ -130,7 +132,7 @@ impl Cafetera {
             let (cafe_lock, cafe_cvar) = &*contenedor_cafe;
             while cafe_servido < cant_cafe {
                 let mut state = cafe_cvar.wait_while(cafe_lock.lock().unwrap(), |cont| {
-                    !(cont.cafe_molido > 0 && !cont.en_uso)
+                    cont.cafe_molido == 0 || cont.en_uso
                 }).unwrap();
                 state.en_uso = true;
                 let cantidad_a_servir = std::cmp::min(cant_cafe - cafe_servido, state.cafe_molido);
@@ -140,12 +142,17 @@ impl Cafetera {
                 state.cafe_molido -= cantidad_a_servir;
                 println!("[INFO] Cafe: {}", state.cafe_molido);
                 state.en_uso = false;
+                if state.cafe_molido == 0 {
+                    cafe_cvar.notify_all();
+                } else {
+                    cafe_cvar.notify_one();
+                }
             }
 
             let (esp_lock, esp_cvar) = &*contenedor_espuma;
             while espuma_servida < cant_espuma {
                 let mut state = esp_cvar.wait_while(esp_lock.lock().unwrap(), |cont| {
-                    !(cont.espuma > 0 && !cont.en_uso)
+                    cont.espuma == 0 || cont.en_uso
                 }).unwrap();
                 state.en_uso = true;
                 let cantidad_a_servir = std::cmp::min(cant_espuma - espuma_servida, state.espuma);
@@ -155,6 +162,11 @@ impl Cafetera {
                 state.espuma -= cantidad_a_servir;
                 println!("[INFO] Espuma: {}", state.espuma);
                 state.en_uso = false;
+                if state.espuma == 0 {
+                    esp_cvar.notify_all();
+                } else {
+                    esp_cvar.notify_one();
+                }
             }
 
             println!("Pedido {} completado!", n);
