@@ -14,6 +14,7 @@ const TIEMPO_ESPUMA: u64 = 4000;
 const TIEMPO_LECHE: u64 = 2000;
 
 pub struct Cafetera {
+    id: usize,
     cafe: Arc<(Mutex<ContenedorCafe>, Condvar)>,
     espuma: Arc<(Mutex<ContenedorEspuma>, Condvar)>,
     dispensadores: Arc<(Mutex<Vec<bool>>, Condvar)>
@@ -30,8 +31,9 @@ pub struct ContenedorEspuma {
 }
 
 impl Cafetera {
-    pub fn new() -> Cafetera {
+    #[must_use] pub fn new(id: usize) -> Cafetera {
         Cafetera {
+            id,
             cafe: Arc::new((
                 Mutex::new(ContenedorCafe{cafe_molido: 0, en_uso: false}),
                 Condvar::new()
@@ -44,37 +46,39 @@ impl Cafetera {
         }
     }
 
-    fn producir_cafe(&mut self) -> JoinHandle<()> {
+    pub fn producir_cafe(&mut self) -> JoinHandle<()> {
         let mut contenedor_granos = G;
         let contenedor_cafe = self.cafe.clone();
+        let id_local = self.id;
 
         thread::spawn(move || loop {
             {
                 let (lock, cvar) = &*contenedor_cafe;
                 let mut state = cvar.wait_while(lock.lock().unwrap(), |cont| {
-                    !(cont.cafe_molido == 0 && !cont.en_uso)
+                    cont.cafe_molido != 0 || cont.en_uso
                 }).unwrap();
                 state.en_uso = true;
                 let cantidad = std::cmp::min(C, contenedor_granos);
-                println!("Reponiendo cafe molido");
+                println!("[Cafetera {}] Reponiendo cafe molido", id_local);
                 thread::sleep(Duration::from_millis(TIEMPO_CAFE));
                 state.cafe_molido += cantidad;
                 contenedor_granos -= cantidad;
-                println!("[INFO] Cafe: {}, granos: {}", state.cafe_molido, contenedor_granos);
+                println!("[Cafetera {}] Cafe: {}, granos: {}", id_local, state.cafe_molido, contenedor_granos);
                 state.en_uso = false;
-                cvar.notify_one();
+                cvar.notify_all();
             }
             if contenedor_granos == 0 {
-                println!("Reponiendo granos");
+                println!("[Cafetera {}] Reponiendo granos", id_local);
                 thread::sleep(Duration::from_millis(TIEMPO_GRANOS));
                 contenedor_granos = G;
             }
         })
     }
 
-    fn producir_espuma(&mut self) -> JoinHandle<()> {
+    pub fn producir_espuma(&mut self) -> JoinHandle<()> {
         let mut contenedor_leche = L;
         let contenedor_espuma = self.espuma.clone();
+        let id_local = self.id;
 
         thread::spawn(move || loop {
             {
@@ -84,26 +88,27 @@ impl Cafetera {
                 }).unwrap();
                 state.en_uso = true;
                 let cantidad = std::cmp::min(E, contenedor_leche);
-                println!("Reponiendo espuma");
+                println!("[Cafetera {}] Reponiendo espuma", id_local);
                 thread::sleep(Duration::from_millis(TIEMPO_ESPUMA));
                 state.espuma += cantidad;
                 contenedor_leche -= cantidad;
                 state.en_uso = false;
-                println!("[INFO] Espuma: {}, leche: {}", state.espuma, contenedor_leche);
-                cvar.notify_one();
+                println!("[Cafetera {}] Espuma: {}, leche: {}", id_local, state.espuma, contenedor_leche);
+                cvar.notify_all();
             }
             if contenedor_leche == 0 {
-                println!("Reponiendo leche");
+                println!("[Cafetera {}] Reponiendo leche", id_local);
                 thread::sleep(Duration::from_millis(TIEMPO_LECHE));
                 contenedor_leche = L;
             }
         })
     }
 
-    fn servir(&mut self, n: usize, cant_cafe: u32, cant_espuma: u32, cant_agua: u32) -> JoinHandle<()> {
+    pub fn servir(&mut self, n: usize, cant_cafe: u32, cant_espuma: u32, cant_agua: u32) -> JoinHandle<()> {
         let dispensadores = self.dispensadores.clone();
         let contenedor_cafe = self.cafe.clone();
         let contenedor_espuma = self.espuma.clone();
+        let id_local = self.id;
         
         thread::spawn(move || {
             let (lock, cvar) = &*dispensadores;
@@ -113,12 +118,12 @@ impl Cafetera {
 
             {
                 let mut state = cvar.wait_while(lock.lock().unwrap(), |disp| {
-                    println!("Pedido {} esperando dispensador", n);
+                    println!("[Cafetera {}] Pedido {} esperando dispensador", id_local, n);
                     !disp.iter().any(|&x| x)
                 }).unwrap();
-                for ing in (*state).iter_mut() {
+                for ing in &mut (*state) {
                     if *ing {
-                        println!("Pedido {} en dispensador {}", n, dispensador);
+                        println!("[Cafetera {}] Pedido {} en dispensador {}", id_local, n, dispensador);
                         *ing = false;
                         break;
                     }
@@ -126,8 +131,8 @@ impl Cafetera {
                 }
             }
 
-            println!("Pedido {} sirviendo agua", n);
-            thread::sleep(Duration::from_millis((cant_agua * 100) as u64));
+            println!("[Cafetera {}] Pedido {} sirviendo agua", id_local, n);
+            thread::sleep(Duration::from_millis(u64::from(cant_agua * 100)));
             
             let (cafe_lock, cafe_cvar) = &*contenedor_cafe;
             while cafe_servido < cant_cafe {
@@ -136,17 +141,13 @@ impl Cafetera {
                 }).unwrap();
                 state.en_uso = true;
                 let cantidad_a_servir = std::cmp::min(cant_cafe - cafe_servido, state.cafe_molido);
-                println!("Pedido {} sirviendo cafe", n);
-                thread::sleep(Duration::from_millis((cantidad_a_servir * 100) as u64));
+                println!("[Cafetera {}] Pedido {} sirviendo cafe", id_local, n);
+                thread::sleep(Duration::from_millis(u64::from(cantidad_a_servir * 100)));
                 cafe_servido += cantidad_a_servir;
                 state.cafe_molido -= cantidad_a_servir;
-                println!("[INFO] Cafe: {}", state.cafe_molido);
+                println!("[Cafetera {}] Cafe: {}", id_local, state.cafe_molido);
                 state.en_uso = false;
-                if state.cafe_molido == 0 {
-                    cafe_cvar.notify_all();
-                } else {
-                    cafe_cvar.notify_one();
-                }
+                cafe_cvar.notify_all();
             }
 
             let (esp_lock, esp_cvar) = &*contenedor_espuma;
@@ -156,20 +157,16 @@ impl Cafetera {
                 }).unwrap();
                 state.en_uso = true;
                 let cantidad_a_servir = std::cmp::min(cant_espuma - espuma_servida, state.espuma);
-                println!("Pedido {}: sirviendo espuma", n);
-                thread::sleep(Duration::from_millis((cantidad_a_servir * 100) as u64));
+                println!("[Cafetera {}] Pedido {}: sirviendo espuma", id_local, n);
+                thread::sleep(Duration::from_millis(u64::from(cantidad_a_servir * 100)));
                 espuma_servida += cantidad_a_servir;
                 state.espuma -= cantidad_a_servir;
-                println!("[INFO] Espuma: {}", state.espuma);
+                println!("[Cafetera {}] Espuma: {}", id_local, state.espuma);
                 state.en_uso = false;
-                if state.espuma == 0 {
-                    esp_cvar.notify_all();
-                } else {
-                    esp_cvar.notify_one();
-                }
+                esp_cvar.notify_all();
             }
 
-            println!("Pedido {} completado!", n);
+            println!("[Cafetera {}] Pedido {} completado!", id_local, n);
             let mut state = lock.lock().unwrap();
             state[dispensador] = true;
             cvar.notify_one();
@@ -178,7 +175,7 @@ impl Cafetera {
 
     pub fn run(&mut self) {
         let mut handlers = vec![self.producir_cafe(), self.producir_espuma()];
-        for i in 0..12 {
+        for i in 0..50 {
             handlers.push(self.servir(i, 10, 10, 10));
         }
         for h in handlers {
@@ -186,10 +183,4 @@ impl Cafetera {
         }
     }
 
-}
-
-impl Default for Cafetera {
-    fn default() -> Self {
-        Self::new()
-    }
 }

@@ -1,6 +1,6 @@
-use coffee::cafetera::Cafetera;
+use coffee::cafeteria::Cafeteria;
 
 fn main() {
-    let mut cafetera = Cafetera::new();
-    cafetera.run();
+    let mut cafeteria = Cafeteria::new();
+    cafeteria.atender_clientes();
 }
