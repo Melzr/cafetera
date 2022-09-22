@@ -2,7 +2,7 @@ use std::thread;
 use std::sync::{Condvar, Mutex, Arc};
 use std::time::Duration;
 
-use crate::constantes::{CAFETERAS, N, C, E, TIEMPO_POR_UNIDAD, TIEMPO_CAFE, TIEMPO_ESPUMA};
+use crate::constantes::{CAFETERAS, N, C, E, G, L, TIEMPO_POR_UNIDAD, TIEMPO_CAFE, TIEMPO_ESPUMA, TIEMPO_GRANOS, TIEMPO_LECHE};
 use crate::cafetera::{Cafetera, ContenedorCafe, ContenedorEspuma};
 use crate::pedido::Pedido;
 
@@ -78,9 +78,16 @@ fn realizar_pedido(id_pedido: usize, pedido: &Pedido, dispensadores: Arc<(Mutex<
     }) {
         state.en_uso = true;
         if pedido.cafe > state.cafe_molido {
+            if state.granos < C {
+                println!("[Cafetera {}] Reponiendo granos", id_cafetera);
+                thread::sleep(Duration::from_millis(TIEMPO_GRANOS));
+                state.granos = G;
+            }
             println!("[Cafetera {}] Reponiendo cafe molido", id_cafetera);
             thread::sleep(Duration::from_millis(TIEMPO_CAFE));
-            state.cafe_molido += C;
+            let cantidad = C - state.cafe_molido;
+            state.cafe_molido += cantidad;
+            state.granos -= cantidad;
         }
         println!("[Cafetera {}] Pedido {} sirviendo cafe", id_cafetera, id_pedido);
         thread::sleep(Duration::from_millis(u64::from(pedido.cafe) * TIEMPO_POR_UNIDAD));
@@ -96,9 +103,16 @@ fn realizar_pedido(id_pedido: usize, pedido: &Pedido, dispensadores: Arc<(Mutex<
     }) {
         state.en_uso = true;
         if pedido.espuma > state.espuma {
+            if state.leche < E {
+                println!("[Cafetera {}] Reponiendo leche", id_cafetera);
+                thread::sleep(Duration::from_millis(TIEMPO_LECHE));
+                state.leche = L;
+            }
             println!("[Cafetera {}] Reponiendo espuma", id_cafetera);
             thread::sleep(Duration::from_millis(TIEMPO_ESPUMA));
-            state.espuma += E;
+            let cantidad = E - state.espuma;
+            state.espuma += cantidad;
+            state.leche -= cantidad;
         }
         println!("[Cafetera {}] Pedido {} sirviendo espuma", id_cafetera, id_pedido);
         thread::sleep(Duration::from_millis(u64::from(pedido.espuma) * TIEMPO_POR_UNIDAD));
