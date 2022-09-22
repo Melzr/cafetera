@@ -4,8 +4,7 @@ use coffee::pedido::Pedido;
 use rand::Rng;
 
 fn main() {
-    let data = fs::read_to_string("./pedidos.json")
-    .expect("Unable to read file");
+    let data = fs::read_to_string("./pedidos.json").expect("Unable to read file");
     let pedidos: Vec<Pedido> = serde_json::from_str::<Vec<Pedido>>(&data).unwrap();
     
     let cafeteria = Cafeteria::new();

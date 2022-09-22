@@ -1,24 +1,10 @@
+use std::thread;
 use std::sync::{Condvar, Mutex, Arc};
-use std::thread::{JoinHandle, self};
 use std::time::Duration;
 
+use crate::constantes::{CAFETERAS, N, C, E, TIEMPO_POR_UNIDAD, TIEMPO_CAFE, TIEMPO_ESPUMA};
 use crate::cafetera::{Cafetera, ContenedorCafe, ContenedorEspuma};
 use crate::pedido::Pedido;
-
-const N: usize = 3;
-const CAFETERAS: usize = 3;
-
-
-const G: u32 = 1000;
-const C: u32 = 100;
-const L: u32 = 1000;
-const E: u32 = 100;
-
-const TIEMPO_CAFE: u64 = 4000;
-const TIEMPO_GRANOS: u64 = 2000;
-const TIEMPO_ESPUMA: u64 = 4000;
-const TIEMPO_LECHE: u64 = 2000;
-const TIEMPO_POR_UNIDAD: u64 = 100;
 
 pub struct Cafeteria {
     cafeteras: Vec<Cafetera>,
@@ -26,28 +12,28 @@ pub struct Cafeteria {
 }
 
 impl Cafeteria {
+    #[must_use]
     pub fn new() -> Cafeteria {
         Cafeteria {
-            cafeteras: (0..CAFETERAS).map(|i| Cafetera::new(i)).collect(),
+            cafeteras: (0..CAFETERAS).map(Cafetera::new).collect(),
             dispensadores: Arc::new((Mutex::new(vec![true; N*CAFETERAS]), Condvar::new())),
         }
     }
 
     pub fn realizar_pedidos(&self, pedidos: Vec<Pedido>) {
         let mut handles = Vec::new();        
-        let mut i = 0;
-        for pedido in pedidos {
+        for (i, pedido) in pedidos.into_iter().enumerate() {
             let dispensador = self.obtener_dispensador(i);
             let dispensadores = self.dispensadores.clone();
             let cafetera = &self.cafeteras[dispensador%CAFETERAS];
             let cafe = cafetera.cafe.clone();
             let espuma = cafetera.espuma.clone();
+            let id_cafetera = cafetera.id;
             handles.push(
                 thread::spawn(move || {
-                    servir(i, pedido, dispensadores, dispensador, dispensador%CAFETERAS, cafe, espuma)
+                    realizar_pedido(i, &pedido, dispensadores, dispensador, id_cafetera, cafe, espuma);
                 })
             );
-            i += 1;
         }
 
         for h in handles {
@@ -76,7 +62,13 @@ impl Cafeteria {
 
 }
 
-fn servir(id_pedido: usize, pedido: Pedido, dispensadores: Arc<(Mutex<Vec<bool>>, Condvar)>, dispensador: usize, id_cafetera: usize, cafe: Arc<(Mutex<ContenedorCafe>, Condvar)>, espuma: Arc<(Mutex<ContenedorEspuma>, Condvar)>) {
+impl Default for Cafeteria {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn realizar_pedido(id_pedido: usize, pedido: &Pedido, dispensadores: Arc<(Mutex<Vec<bool>>, Condvar)>, dispensador: usize, id_cafetera: usize, cafe: Arc<(Mutex<ContenedorCafe>, Condvar)>, espuma: Arc<(Mutex<ContenedorEspuma>, Condvar)>) {
     println!("[Cafetera {}] Pedido {} sirviendo agua", id_cafetera, id_pedido);
     thread::sleep(Duration::from_millis(u64::from(pedido.agua) * TIEMPO_POR_UNIDAD));
     
