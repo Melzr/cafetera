@@ -8,10 +8,10 @@ fn main() {
     .expect("Unable to read file");
     let pedidos: Vec<Pedido> = serde_json::from_str::<Vec<Pedido>>(&data).unwrap();
     
-    let mut cafeteria = Cafeteria::new();
-    cafeteria.atender_clientes(pedidos);
+    let cafeteria = Cafeteria::new();
+    cafeteria.realizar_pedidos(pedidos);
 
-    // generate 100 random Pedido
+
     // let mut rng = rand::thread_rng();
     // let pedidos: Vec<Pedido> = (0..100)
     //     .map(|_| Pedido {
@@ -23,7 +23,6 @@ fn main() {
     
     // println!("{:?}", pedidos);
 
-    // serialize pedidos to json file
     // let json = serde_json::to_string(&pedidos).unwrap();
     // fs::write("./pedidos.json", json).expect("Unable to write file");
 

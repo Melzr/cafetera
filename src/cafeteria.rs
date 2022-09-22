@@ -1,37 +1,126 @@
-use crate::cafetera::Cafetera;
+use std::sync::{Condvar, Mutex, Arc};
+use std::thread::{JoinHandle, self};
+use std::time::Duration;
+
+use crate::cafetera::{Cafetera, ContenedorCafe, ContenedorEspuma};
 use crate::pedido::Pedido;
 
 const N: usize = 3;
+const CAFETERAS: usize = 3;
+
+
+const G: u32 = 1000;
+const C: u32 = 100;
+const L: u32 = 1000;
+const E: u32 = 100;
+
+const TIEMPO_CAFE: u64 = 4000;
+const TIEMPO_GRANOS: u64 = 2000;
+const TIEMPO_ESPUMA: u64 = 4000;
+const TIEMPO_LECHE: u64 = 2000;
+const TIEMPO_POR_UNIDAD: u64 = 100;
 
 pub struct Cafeteria {
-  cafeteras: Vec<Cafetera>,
+    cafeteras: Vec<Cafetera>,
+    dispensadores: Arc<(Mutex<Vec<bool>>, Condvar)>,
 }
 
 impl Cafeteria {
-  pub fn new() -> Cafeteria {
-    Cafeteria {
-      cafeteras: (0..N).map(|i| Cafetera::new(i)).collect(),
-    }
-  }
-
-  pub fn atender_clientes(&mut self, pedidos: Vec<Pedido>) {
-    let mut handles = Vec::new();
-    for cafetera in self.cafeteras.iter_mut() {
-      handles.push(cafetera.producir_cafe());
-      handles.push(cafetera.producir_espuma());
+    pub fn new() -> Cafeteria {
+        Cafeteria {
+            cafeteras: (0..CAFETERAS).map(|i| Cafetera::new(i)).collect(),
+            dispensadores: Arc::new((Mutex::new(vec![true; N*CAFETERAS]), Condvar::new())),
+        }
     }
 
-    // iterate pedidos and get index
-    let mut i = 0;
-    for pedido in pedidos {
-      let cafetera_index = i % N;
-      let cafetera = &mut self.cafeteras[cafetera_index];
-      handles.push(cafetera.servir(i, pedido));
-      i += 1;
+    pub fn realizar_pedidos(&self, pedidos: Vec<Pedido>) {
+        let mut handles = Vec::new();        
+        let mut i = 0;
+        for pedido in pedidos {
+            let dispensador = self.obtener_dispensador(i);
+            let dispensadores = self.dispensadores.clone();
+            let cafetera = &self.cafeteras[dispensador%CAFETERAS];
+            let cafe = cafetera.cafe.clone();
+            let espuma = cafetera.espuma.clone();
+            handles.push(
+                thread::spawn(move || {
+                    servir(i, pedido, dispensadores, dispensador, dispensador%CAFETERAS, cafe, espuma)
+                })
+            );
+            i += 1;
+        }
+
+        for h in handles {
+            h.join().unwrap();
+        }
+    }
+    
+    fn obtener_dispensador(&self, id: usize) -> usize {
+        let (lock, cvar) = &*(self.dispensadores);
+        println!("Pedido {} esperando dispensador", id);
+        let mut num_disp = 0;
+        if let Ok(mut state) = cvar.wait_while(lock.lock().unwrap(), |disp| {
+            !disp.iter().any(|&x| x)
+        }) {
+            for (i, disp) in state.iter_mut().enumerate() {
+                if *disp {
+                    *disp = false;
+                    num_disp = i;
+                    println!("Pedido {} en dispensador {}", id, i);
+                    break;
+                }
+            }
+        }
+        num_disp
     }
 
-    for h in handles {
-      h.join().unwrap();
+}
+
+fn servir(id_pedido: usize, pedido: Pedido, dispensadores: Arc<(Mutex<Vec<bool>>, Condvar)>, dispensador: usize, id_cafetera: usize, cafe: Arc<(Mutex<ContenedorCafe>, Condvar)>, espuma: Arc<(Mutex<ContenedorEspuma>, Condvar)>) {
+    println!("[Cafetera {}] Pedido {} sirviendo agua", id_cafetera, id_pedido);
+    thread::sleep(Duration::from_millis(u64::from(pedido.agua) * TIEMPO_POR_UNIDAD));
+    
+    let (cafe_lock, cafe_cvar) = &*cafe;
+    if let Ok(mut state) = cafe_cvar.wait_while(cafe_lock.lock().unwrap(), |cont| {
+        cont.en_uso
+    }) {
+        state.en_uso = true;
+        if pedido.cafe > state.cafe_molido {
+            println!("[Cafetera {}] Reponiendo cafe molido", id_cafetera);
+            thread::sleep(Duration::from_millis(TIEMPO_CAFE));
+            state.cafe_molido += C;
+        }
+        println!("[Cafetera {}] Pedido {} sirviendo cafe", id_cafetera, id_pedido);
+        thread::sleep(Duration::from_millis(u64::from(pedido.cafe) * TIEMPO_POR_UNIDAD));
+        state.cafe_molido -= pedido.cafe;
+        println!("[Cafetera {}] Cafe: {}", id_cafetera, state.cafe_molido);
+        state.en_uso = false;
+        cafe_cvar.notify_one();
     }
-  }
+
+    let (esp_lock, esp_cvar) = &*espuma;
+    if let Ok(mut state) = esp_cvar.wait_while(esp_lock.lock().unwrap(), |cont| {
+        cont.en_uso
+    }) {
+        state.en_uso = true;
+        if pedido.espuma > state.espuma {
+            println!("[Cafetera {}] Reponiendo espuma", id_cafetera);
+            thread::sleep(Duration::from_millis(TIEMPO_ESPUMA));
+            state.espuma += E;
+        }
+        println!("[Cafetera {}] Pedido {} sirviendo espuma", id_cafetera, id_pedido);
+        thread::sleep(Duration::from_millis(u64::from(pedido.espuma) * TIEMPO_POR_UNIDAD));
+        state.espuma -= pedido.espuma;
+        println!("[Cafetera {}] Espuma: {}", id_cafetera, state.espuma);
+        state.en_uso = false;
+        esp_cvar.notify_one();
+    }
+
+    println!("[Cafetera {}] Pedido {} completado!", id_cafetera, id_pedido);
+
+    let (disp_lock, disp_cvar) = &*dispensadores;
+    if let Ok(mut state) = disp_lock.lock() {
+        state[dispensador] = true;
+    }
+    disp_cvar.notify_one();
 }
