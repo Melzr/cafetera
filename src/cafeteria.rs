@@ -1,4 +1,5 @@
 use crate::cafetera::Cafetera;
+use crate::pedido::Pedido;
 
 const N: usize = 3;
 
@@ -13,16 +14,20 @@ impl Cafeteria {
     }
   }
 
-  pub fn atender_clientes(&mut self) {
+  pub fn atender_clientes(&mut self, pedidos: Vec<Pedido>) {
     let mut handles = Vec::new();
     for cafetera in self.cafeteras.iter_mut() {
       handles.push(cafetera.producir_cafe());
       handles.push(cafetera.producir_espuma());
     }
 
-    for i in 0..100 {
-      let cafetera = &mut self.cafeteras[i % N];
-      handles.push(cafetera.servir(i, 10, 10, 10));
+    // iterate pedidos and get index
+    let mut i = 0;
+    for pedido in pedidos {
+      let cafetera_index = i % N;
+      let cafetera = &mut self.cafeteras[cafetera_index];
+      handles.push(cafetera.servir(i, pedido));
+      i += 1;
     }
 
     for h in handles {

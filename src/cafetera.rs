@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex, Condvar};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
+use crate::pedido::Pedido;
 
 const G: u32 = 1000;
 const C: u32 = 100;
@@ -104,7 +105,7 @@ impl Cafetera {
         })
     }
 
-    pub fn servir(&mut self, n: usize, cant_cafe: u32, cant_espuma: u32, cant_agua: u32) -> JoinHandle<()> {
+    pub fn servir(&mut self, n: usize, pedido: Pedido) -> JoinHandle<()> {
         let dispensadores = self.dispensadores.clone();
         let contenedor_cafe = self.cafe.clone();
         let contenedor_espuma = self.espuma.clone();
@@ -132,15 +133,15 @@ impl Cafetera {
             }
 
             println!("[Cafetera {}] Pedido {} sirviendo agua", id_local, n);
-            thread::sleep(Duration::from_millis(u64::from(cant_agua * 100)));
+            thread::sleep(Duration::from_millis(u64::from(pedido.agua * 100)));
             
             let (cafe_lock, cafe_cvar) = &*contenedor_cafe;
-            while cafe_servido < cant_cafe {
+            while cafe_servido < pedido.cafe {
                 let mut state = cafe_cvar.wait_while(cafe_lock.lock().unwrap(), |cont| {
                     cont.cafe_molido == 0 || cont.en_uso
                 }).unwrap();
                 state.en_uso = true;
-                let cantidad_a_servir = std::cmp::min(cant_cafe - cafe_servido, state.cafe_molido);
+                let cantidad_a_servir = std::cmp::min(pedido.cafe - cafe_servido, state.cafe_molido);
                 println!("[Cafetera {}] Pedido {} sirviendo cafe", id_local, n);
                 thread::sleep(Duration::from_millis(u64::from(cantidad_a_servir * 100)));
                 cafe_servido += cantidad_a_servir;
@@ -151,12 +152,12 @@ impl Cafetera {
             }
 
             let (esp_lock, esp_cvar) = &*contenedor_espuma;
-            while espuma_servida < cant_espuma {
+            while espuma_servida < pedido.espuma {
                 let mut state = esp_cvar.wait_while(esp_lock.lock().unwrap(), |cont| {
                     cont.espuma == 0 || cont.en_uso
                 }).unwrap();
                 state.en_uso = true;
-                let cantidad_a_servir = std::cmp::min(cant_espuma - espuma_servida, state.espuma);
+                let cantidad_a_servir = std::cmp::min(pedido.espuma - espuma_servida, state.espuma);
                 println!("[Cafetera {}] Pedido {}: sirviendo espuma", id_local, n);
                 thread::sleep(Duration::from_millis(u64::from(cantidad_a_servir * 100)));
                 espuma_servida += cantidad_a_servir;
@@ -173,14 +174,14 @@ impl Cafetera {
         })
     }
 
-    pub fn run(&mut self) {
-        let mut handlers = vec![self.producir_cafe(), self.producir_espuma()];
-        for i in 0..50 {
-            handlers.push(self.servir(i, 10, 10, 10));
-        }
-        for h in handlers {
-            h.join().unwrap();
-        }
-    }
+    // pub fn run(&mut self) {
+    //     let mut handlers = vec![self.producir_cafe(), self.producir_espuma()];
+    //     for i in 0..50 {
+    //         handlers.push(self.servir(i, 10, 10, 10));
+    //     }
+    //     for h in handlers {
+    //         h.join().unwrap();
+    //     }
+    // }
 
 }
