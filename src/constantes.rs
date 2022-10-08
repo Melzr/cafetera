@@ -20,3 +20,5 @@ pub const TIEMPO_CAFE: u64 = 2000;
 pub const TIEMPO_ESPUMA: u64 = 2000;
 /// Tiempo de espera por unidad de cafe, agua o espuma del pedido
 pub const TIEMPO_POR_UNIDAD: u64 = 100;
+/// Tiempo transcurrido hasta mostrar las estadísticas
+pub const TIEMPO_STATS: u64 = 5000;

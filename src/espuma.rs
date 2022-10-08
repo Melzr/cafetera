@@ -14,7 +14,11 @@ pub struct ContenedorEspuma {
     /// Solo puede ser usado por un dispensador a la vez
     pub en_uso: bool,
     /// true si no quedan pedidos por realizar
-    pub fin: bool
+    pub fin: bool,
+    /// Cantidad total de espuma consumida
+    pub espuma_consumida: u32,
+    /// Cantidad total de leche consumida
+    pub leche_consumida: u32,
 }
 
 impl ContenedorEspuma {
@@ -24,7 +28,9 @@ impl ContenedorEspuma {
             espuma: 0,
             leche: L,
             en_uso: false,
-            fin: false
+            fin: false,
+            espuma_consumida: 0,
+            leche_consumida: 0,
         }
     }
 }
@@ -50,6 +56,7 @@ pub fn rellenar_expuma(contenedor: Arc<(Mutex<ContenedorEspuma>, Condvar)>) {
             let cantidad = min(E - state.espuma, state.leche);
             state.espuma += cantidad;
             state.leche -= cantidad;
+            state.leche_consumida += cantidad;
             if state.leche < E {
                 println!("[INFO] contenedor de leche por debajo del {}%. Reponiendo.", E * 100 / L);
                 state.leche = L;

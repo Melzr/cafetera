@@ -14,7 +14,11 @@ pub struct ContenedorCafe {
     /// Solo puede ser usado por un dispensador a la vez
     pub en_uso: bool,
     /// true si no quedan pedidos por realizar
-    pub fin: bool
+    pub fin: bool,
+    /// Cantidad total de cafe molido consumido
+    pub cafe_consumido: u32,
+    /// Cantidad total de granos de cafe consumidos
+    pub granos_consumidos: u32,
 }
 
 impl ContenedorCafe {
@@ -24,7 +28,9 @@ impl ContenedorCafe {
             cafe_molido: 0,
             granos: G,
             en_uso: false,
-            fin: false
+            fin: false,
+            cafe_consumido: 0,
+            granos_consumidos: 0,
         }
     }
 }
@@ -50,6 +56,7 @@ pub fn rellenar_cafe(contenedor: Arc<(Mutex<ContenedorCafe>, Condvar)>) {
             let cantidad = min(C - state.cafe_molido, state.granos);
             state.cafe_molido += cantidad;
             state.granos -= cantidad;
+            state.granos_consumidos += cantidad;
             if state.granos < C {
                 println!("[INFO] contenedor de granos por debajo del {}%. Reponiendo.", C * 100 / G);
                 state.granos = G;
