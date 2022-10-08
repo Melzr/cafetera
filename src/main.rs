@@ -1,14 +1,14 @@
 use std::fs;
-use coffee::cafeteria::Cafeteria;
-use coffee::pedido::Pedido;
+use cafeteria::cafetera::Cafetera;
+use cafeteria::pedido::Pedido;
 use rand::Rng;
 
 fn main() {
     let data = fs::read_to_string("./pedidos.json").expect("Unable to read file");
     let pedidos: Vec<Pedido> = serde_json::from_str::<Vec<Pedido>>(&data).unwrap();
     
-    let cafeteria = Cafeteria::new();
-    cafeteria.realizar_pedidos(pedidos);
+    let cafetera = Cafetera::new();
+    cafetera.realizar_pedidos(pedidos);
 
 
     // let mut rng = rand::thread_rng();

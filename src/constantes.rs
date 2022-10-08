@@ -6,10 +6,8 @@ pub const C: u32 = 100;
 pub const L: u32 = 1000;
 /// Capacidad del contenedor de espuma
 pub const E: u32 = 100;
-/// Cantidad de dispensadores por cafetera
+/// Cantidad de dispensadores
 pub const N: usize = 3;
-/// Cantidad de cafeteras
-pub const CAFETERAS: usize = 3;
 
 /// Tiempo de espera para reponer el contenedor ded cafe molido
 pub const TIEMPO_CAFE: u64 = 4000;
