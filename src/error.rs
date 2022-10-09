@@ -1,10 +1,17 @@
+/// Errores posibles del programa.
 #[derive(Debug)]
 pub enum CafeteriaError {
+    /// No se recibió la ruta al archivo con pedidos.
     ArgumentosInvalidos,
+    /// No se pudo convertir una línea del archivo de pedidos a un [Pedido](`crate::pedido::Pedido`).
     PedidoInvalido,
+    /// No se pudo abrir el archivo de pedidos.
     CreacionArchivo,
+    /// No se pudo abrir el archivo de pedidos.
     AperturaArchivo,
+    /// No se pudo escribir en el archivo de pedidos.
     EscrituraArchivo,
+    /// No se pudo leer una línea del archivo de pedidos.
     LecturaArchivo,
     LockEnvenenado,
 }

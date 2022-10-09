@@ -37,6 +37,12 @@ impl Cafetera {
         }
     }
 
+    /// Lee el archivo de pedidos dado por el argumento ruta y los prepara.
+    /// 
+    /// # Errors
+    /// * En caso de error al abrir el archivo, devuelve [`CafeteriaError::AperturaArchivo`].
+    /// * En caso de error al leer el archivo, devuelve [`CafeteriaError::LecturaArchivo`].
+    /// * En caso de que el lock de los dispensadores se encuentre envenenado, devuelve [`CafeteriaError::LockEnvenenado`].
     pub fn realizar_pedidos(&self, ruta: &str) -> Result<(), CafeteriaError> {
         let file = File::open(ruta).map_err(|_| CafeteriaError::AperturaArchivo)?;
         let file = BufReader::new(file);
@@ -95,6 +101,10 @@ impl Cafetera {
         Ok(())
     }
 
+    /// Obtiene un dispensador libre para el pedido.
+    /// 
+    /// # Errors
+    /// * En caso de que el lock de los dispensadores se encuentre envenenado, devuelve [`CafeteriaError::LockEnvenenado`].
     fn obtener_dispensador(&self, pedido: usize) -> Result<usize, CafeteriaError> {
         let (lock, cvar) = &*(self.dispensadores);
         println!("[DEBUG] Pedido {} esperando dispensador", pedido);
@@ -114,6 +124,8 @@ impl Cafetera {
         Ok(num_disp)
     }
 
+    /// Realiza el pedido utilizando el dispensador recibido en un thread aparte,
+    /// devolviendo su correspondiente [`JoinHandle`].
     fn realizar_pedido(&self, pedido: Pedido, dispensador: usize) -> JoinHandle<()> {
         let dispensadores = self.dispensadores.clone();
         let cafe = self.cafe.clone();
@@ -143,6 +155,10 @@ impl Cafetera {
         })
     }
 
+    /// Sirve cafe al pedido recibido.
+    /// 
+    /// # Errors
+    /// * En caso de que el lock de los dispensadores se encuentre envenenado, devuelve [`CafeteriaError::LockEnvenenado`].
     fn servir_cafe(contenedor_cafe: Arc<(Mutex<ContenedorCafe>, Condvar)>, pedido: &Pedido) -> Result<(), CafeteriaError> {
         let (cafe_lock, cafe_cvar) = &*contenedor_cafe;
         if let Ok(mut state) = cafe_cvar.wait_while(cafe_lock.lock()?, |cont| {
@@ -160,6 +176,10 @@ impl Cafetera {
         Ok(())
     }
 
+    /// Sirve espuma al pedido recibido.
+    /// 
+    /// # Errors
+    /// * En caso de que el lock de los dispensadores se encuentre envenenado, devuelve [`CafeteriaError::LockEnvenenado`].
     fn servir_espuma(contenedor_espuma: Arc<(Mutex<ContenedorEspuma>, Condvar)>, pedido: &Pedido) -> Result<(), CafeteriaError> {
         let (esp_lock, esp_cvar) = &*contenedor_espuma;
         if let Ok(mut state) = esp_cvar.wait_while(esp_lock.lock()?, |cont| {
@@ -177,6 +197,8 @@ impl Cafetera {
         Ok(())
     }
 
+    /// Imprime por consola el estado de la cafetera cada [`TIEMPO_STATS`] milisegundos en un hilo
+    /// aparte, devolviendo su correspondiente [`JoinHandle`].
     fn estadisticas(&self) -> JoinHandle<()> {
         let cafe_lock = self.cafe.clone();
         let espuma_lock = self.espuma.clone();

@@ -42,6 +42,14 @@ impl Default for ContenedorEspuma {
     }
 }
 
+/// Loop donde se rellena el contenedor de espuma cuando su cantidad sea menor a [`MAX_CANTIDAD`]
+/// y el contenedor se encuentre disponible. Se rellena por completo en [`TIEMPO_ESPUMA`] milisegundos,
+/// durante este tiempo no se podrá utilizar el dispensador de espuma.
+/// También se rellena el contenedor de leche cuando su cantidad sea menor a [`E`], esto es instantáneo.
+/// Finaliza cuando [`ContenedorEspuma`].fin es true.
+/// 
+/// # Errors
+/// * En caso de que el lock del contenedor se encuentre envenenado, devuelve [`CafeteriaError::LockEnvenenado`].
 pub fn rellenar_espuma(contenedor: Arc<(Mutex<ContenedorEspuma>, Condvar)>) -> Result<(), CafeteriaError> {
     let (espuma_lock, espuma_cvar) = &*contenedor;
     loop {

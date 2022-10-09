@@ -42,6 +42,14 @@ impl Default for ContenedorCafe {
     }
 }
 
+/// Loop donde se rellena el contenedor de cafe molido cuando su cantidad sea menor a [`MAX_CANTIDAD`]
+/// y el contenedor se encuentre disponible. Se rellena por completo en [`TIEMPO_CAFE`] milisegundos,
+/// durante este tiempo no se podrá utilizar el dispensador de café.
+/// También se rellena el contenedor de granos cuando su cantidad sea menor a [`C`], esto es instantáneo.
+/// Finaliza cuando [`ContenedorCafe`].fin es true.
+/// 
+/// # Errors
+/// * En caso de que el lock del contenedor se encuentre envenenado, devuelve [`CafeteriaError::LockEnvenenado`].
 pub fn rellenar_cafe(contenedor: Arc<(Mutex<ContenedorCafe>, Condvar)>) -> Result<(), CafeteriaError> {
     let (cafe_lock, cafe_cvar) = &*contenedor;
     loop {

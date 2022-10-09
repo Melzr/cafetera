@@ -7,6 +7,13 @@ use crate::error::CafeteriaError;
 
 const CANT_PEDIDOS: usize = 100;
 
+/// Información del pedido de un cliente.
+/// 
+/// Se representa como una línea en el archivo de pedidos de la siguiente manera:
+/// 
+/// ```
+/// <id>,<agua>,<cafe>,<espuma>
+/// ```
 #[derive(Debug)]
 pub struct Pedido {
     pub id: usize,
@@ -19,6 +26,9 @@ pub struct Pedido {
 }
 
 impl Pedido {
+    /// # Errors
+    /// * En caso de que agua, cafe o espuma no estén en el rango [[`MIN_CANTIDAD`], =[`MAX_CANTIDAD`]]
+    /// devuelve [`CafeteriaError::PedidoInvalido`].
     pub fn new(id: usize, agua: u32, cafe: u32, espuma: u32) -> Result<Pedido, CafeteriaError> {
         if !(MIN_CANTIDAD..=MAX_CANTIDAD).contains(&agua) ||
             !(MIN_CANTIDAD..=MAX_CANTIDAD).contains(&cafe) ||
@@ -29,6 +39,7 @@ impl Pedido {
         }
     }
 
+    /// Genera un pedido con cantidades aleatorias de agua, café y espuma.
     pub fn new_random(id: usize) -> Pedido {
         Pedido {
             id,
@@ -38,6 +49,12 @@ impl Pedido {
         }
     }
 
+    /// Parsea una línea de un archivo de pedidos.
+    /// 
+    /// # Errors
+    /// * En caso de que agua, cafe o espuma no estén en el rango [[`MIN_CANTIDAD`], =[`MAX_CANTIDAD`]]
+    /// devuelve [`CafeteriaError::PedidoInvalido`].
+    /// * En caso de que la línea no tenga el formato correcto devuelve [`CafeteriaError::PedidoInvalido`].
     pub fn from_line(line: &str) -> Result<Pedido, CafeteriaError> {
         let mut pedido = line.split(',');
         let id = pedido.next().ok_or(CafeteriaError::PedidoInvalido)?.parse::<usize>()?;
@@ -47,11 +64,13 @@ impl Pedido {
         Pedido::new(id, agua, cafe, espuma)
     }
 
+    /// Parseo a String.
     pub fn to_line(&self) -> String {
         format!("{},{},{},{}", self.id, self.agua, self.cafe, self.espuma)
     }
 }
 
+/// Genera un archivo de pedidos con [`CANT_PEDIDOS`] pedidos aleatorios en la ruta dada.
 pub fn generate_file(ruta: &str) -> Result<(), CafeteriaError> {
     let pedidos: Vec<Pedido> = (1..=CANT_PEDIDOS)
         .map(Pedido::new_random)
