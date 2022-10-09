@@ -11,9 +11,7 @@ const CANT_PEDIDOS: usize = 100;
 ///
 /// Se representa como una línea en el archivo de pedidos de la siguiente manera:
 ///
-/// ```
-/// <id>,<agua>,<cafe>,<espuma>
-/// ```
+/// `<id>,<agua>,<cafe>,<espuma>`
 #[derive(Debug)]
 pub struct Pedido {
     pub id: usize,
