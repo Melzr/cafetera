@@ -207,16 +207,13 @@ impl Cafetera {
             println!("[INFO] Consumo total: cafe {}, granos {}, espuma {}, leche {}", cafe_cons, granos_cons, espuma_cons, leche_cons);
             println!("[INFO] Pedidos completados: {}", cant_pedidos);
             
-            match espuma_lock.0.lock() {
-                Ok(contenedor_espuma) => {
-                    if contenedor_espuma.fin {
-                        break;
-                    }
-                },
-                Err(_) => {
-                    println!("[ERROR] Debido a un error inesperado no se seguiran mostrando las estadisticas");
+            if let Ok(contenedor_espuma) = espuma_lock.0.lock() {
+                if contenedor_espuma.fin {
                     break;
-                },
+                }
+            } else {
+                println!("[ERROR] Debido a un error inesperado no se seguiran mostrando las estadisticas");   
+                break;
             }
 
             thread::sleep(Duration::from_millis(TIEMPO_STATS));

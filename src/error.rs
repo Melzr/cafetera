@@ -6,7 +6,7 @@ pub enum CafeteriaError {
     AperturaArchivo,
     EscrituraArchivo,
     LecturaArchivo,
-    LockError,
+    LockEnvenenado,
 }
 
 impl From<std::num::ParseIntError> for CafeteriaError {
@@ -17,6 +17,6 @@ impl From<std::num::ParseIntError> for CafeteriaError {
 
 impl<T> From<std::sync::PoisonError<T>> for CafeteriaError {
     fn from(_: std::sync::PoisonError<T>) -> Self {
-        CafeteriaError::LockError
+        CafeteriaError::LockEnvenenado
     }
 }

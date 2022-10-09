@@ -19,11 +19,10 @@ pub struct Pedido {
 }
 
 impl Pedido {
-    #[must_use]
     pub fn new(id: usize, agua: u32, cafe: u32, espuma: u32) -> Result<Pedido, CafeteriaError> {
-        if (agua < MIN_CANTIDAD || agua > MAX_CANTIDAD) ||
-            (cafe < MIN_CANTIDAD || cafe > MAX_CANTIDAD) ||
-            (espuma < MIN_CANTIDAD || espuma > MAX_CANTIDAD) {
+        if !(MIN_CANTIDAD..=MAX_CANTIDAD).contains(&agua) ||
+            !(MIN_CANTIDAD..=MAX_CANTIDAD).contains(&cafe) ||
+            !(MIN_CANTIDAD..=MAX_CANTIDAD).contains(&espuma) {
             Err(CafeteriaError::PedidoInvalido)
         } else {
             Ok(Pedido { id, agua, cafe, espuma })
@@ -55,7 +54,7 @@ impl Pedido {
 
 pub fn generate_file(ruta: &str) -> Result<(), CafeteriaError> {
     let pedidos: Vec<Pedido> = (1..=CANT_PEDIDOS)
-        .map(|id| Pedido::new_random(id))
+        .map(Pedido::new_random)
         .collect();
 
     let mut file = File::create(ruta).map_err(|_| CafeteriaError::CreacionArchivo)?;
