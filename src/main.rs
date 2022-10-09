@@ -1,28 +1,20 @@
-use std::fs;
+use cafeteria::error::CafeteriaError;
 use cafeteria::cafetera::Cafetera;
-use cafeteria::pedido::Pedido;
-use rand::Rng;
+// use cafeteria::pedido::generate_file;
 
-fn main() {
-    let data = fs::read_to_string("./pedidos.json").expect("Unable to read file");
-    let pedidos: Vec<Pedido> = serde_json::from_str::<Vec<Pedido>>(&data).unwrap();
-    
-    let cafetera = Cafetera::new();
-    cafetera.realizar_pedidos(pedidos);
+fn main() -> Result<(), CafeteriaError> {
+    let args: Vec<String> = std::env::args().collect();
+    match args.get(1) {
+        Some(ruta) => {
+            let cafetera = Cafetera::new();
+            cafetera.realizar_pedidos(ruta)
 
-
-    // let mut rng = rand::thread_rng();
-    // let pedidos: Vec<Pedido> = (0..100)
-    //     .map(|_| Pedido {
-    //         agua: rng.gen_range(1u32..=10u32),
-    //         cafe: rng.gen_range(1u32..=10u32),
-    //         espuma: rng.gen_range(1u32..=10u32),
-    //     })
-    //     .collect();
-    
-    // println!("{:?}", pedidos);
-
-    // let json = serde_json::to_string(&pedidos).unwrap();
-    // fs::write("./pedidos.json", json).expect("Unable to write file");
+            // generate_file(ruta)
+        },
+        None => {
+            println!("No se especificó la ruta del archivo de pedidos");
+            Err(CafeteriaError::ArgumentosInvalidos)
+        }
+    }
 
 }

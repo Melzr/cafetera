@@ -1,11 +1,14 @@
+use std::fs::File;
+use std::io::{BufReader, BufRead};
 use std::thread::{self, JoinHandle};
 use std::sync::{Condvar, Mutex, Arc};
 use std::time::Duration;
 
-use crate::constantes::{N, TIEMPO_POR_UNIDAD, TIEMPO_STATS};
+use crate::constantes::{N, TIEMPO_POR_UNIDAD, TIEMPO_STATS, TIEMPO_PEDIDO};
+use crate::error::CafeteriaError;
 use crate::pedido::Pedido;
 use crate::cafe::{ContenedorCafe, rellenar_cafe};
-use crate::espuma::{ContenedorEspuma, rellenar_expuma};
+use crate::espuma::{ContenedorEspuma, rellenar_espuma};
 
 pub struct Cafetera {
     dispensadores: Arc<(Mutex<Vec<bool>>, Condvar)>,
@@ -34,45 +37,69 @@ impl Cafetera {
         }
     }
 
-    pub fn realizar_pedidos(&self, pedidos: Vec<Pedido>) {
+    pub fn realizar_pedidos(&self, ruta: &str) -> Result<(), CafeteriaError> {
+        let file = File::open(ruta).map_err(|_| CafeteriaError::AperturaArchivo)?;
+        let file = BufReader::new(file);
         let mut pedidos_handles = Vec::new();   
         let mut cafetera_handles = Vec::new();   
+   
         let cafe = self.cafe.clone();
         cafetera_handles.push(thread::spawn(move || {
-            rellenar_cafe(cafe);
+            if rellenar_cafe(cafe).is_err() {
+                println!("[ERROR] No se pudo rellenar cafe");
+            }
         }));
+
         let espuma = self.espuma.clone();
         cafetera_handles.push(thread::spawn(move || {
-            rellenar_expuma(espuma);
+            if rellenar_espuma(espuma).is_err() {
+                println!("[ERROR] No se pudo rellenar espuma");
+            }
         }));
+
         cafetera_handles.push(self.estadisticas());
-        for (i, pedido) in pedidos.into_iter().enumerate() {
-            let dispensador = self.obtener_dispensador(i);
-            pedidos_handles.push(self.realizar_pedido(i, pedido, dispensador));
+
+        for line in file.lines() {
+            let line = line.map_err(|_| CafeteriaError::LecturaArchivo)?;
+            match Pedido::from_line(&line) {
+                Ok(pedido) => {
+                    let dispensador = self.obtener_dispensador(pedido.id)?;
+                    pedidos_handles.push(self.realizar_pedido(pedido, dispensador));
+                    thread::sleep(Duration::from_millis(TIEMPO_PEDIDO));
+                },
+                Err(e) => {
+                    println!("[WARN] Error al procesar el pedido: {:?}", e);
+                }
+            }
         }
 
         for h in pedidos_handles {
-            h.join().unwrap();
+            if h.join().is_err() {
+                println!("[WARN] Error en el join de un hilo");
+            }
         }
 
         let (cafe_lock, cafe_cvar) = &*self.cafe;
-        cafe_lock.lock().unwrap().fin = true;
+        cafe_lock.lock()?.fin = true;
         cafe_cvar.notify_all();
         let (espuma_lock, espuma_cvar) = &*self.espuma;
-        espuma_lock.lock().unwrap().fin = true;
+        espuma_lock.lock()?.fin = true;
         espuma_cvar.notify_all();
 
         for h in cafetera_handles {
-            h.join().unwrap();
+            if h.join().is_err() {
+                println!("[WARN] Error en el join de un hilo");
+            }
         }
 
+        Ok(())
     }
 
-    fn obtener_dispensador(&self, pedido: usize) -> usize {
+    fn obtener_dispensador(&self, pedido: usize) -> Result<usize, CafeteriaError> {
         let (lock, cvar) = &*(self.dispensadores);
         println!("[DEBUG] Pedido {} esperando dispensador", pedido);
         let mut num_disp = 0;
-        if let Ok(mut state) = cvar.wait_while(lock.lock().unwrap(), |disp| {
+        if let Ok(mut state) = cvar.wait_while(lock.lock()?, |disp| {
             !disp.iter().any(|&x| x)
         }) {
             for (i, disp) in state.iter_mut().enumerate() {
@@ -84,23 +111,27 @@ impl Cafetera {
                 }
             }
         }
-        num_disp
+        Ok(num_disp)
     }
 
-    fn realizar_pedido(&self, id_pedido: usize, pedido: Pedido, dispensador: usize) -> JoinHandle<()> {
+    fn realizar_pedido(&self, pedido: Pedido, dispensador: usize) -> JoinHandle<()> {
         let dispensadores = self.dispensadores.clone();
         let cafe = self.cafe.clone();
         let espuma = self.espuma.clone();
         let pedidos_lock = self.cant_pedidos.clone();
 
         thread::spawn(move || {
-            println!("[DEBUG] Pedido {} sirviendo agua", id_pedido);
+            println!("[DEBUG] Pedido {} sirviendo agua", pedido.id);
             thread::sleep(Duration::from_millis(u64::from(pedido.agua) * TIEMPO_POR_UNIDAD));
             
-            Self::servir_cafe(cafe, &pedido, id_pedido);
-            Self::servir_espuma(espuma, &pedido, id_pedido);
+            if Self::servir_cafe(cafe, &pedido).is_err() {
+                println!("[WARN] Pedido {} no pudo servir cafe", pedido.id);
+            }
+            if Self::servir_espuma(espuma, &pedido).is_err() {
+                println!("[WARN] Pedido {} no pudo servir espuma", pedido.id);
+            }
     
-            println!("[INFO] Pedido {} completado!", id_pedido);
+            println!("[INFO] Pedido {} completado!", pedido.id);
             let (disp_lock, disp_cvar) = &*dispensadores;
             if let Ok(mut state) = disp_lock.lock() {
                 state[dispensador] = true;
@@ -112,36 +143,38 @@ impl Cafetera {
         })
     }
 
-    fn servir_cafe(contenedor_cafe: Arc<(Mutex<ContenedorCafe>, Condvar)>, pedido: &Pedido, id_pedido: usize) {
+    fn servir_cafe(contenedor_cafe: Arc<(Mutex<ContenedorCafe>, Condvar)>, pedido: &Pedido) -> Result<(), CafeteriaError> {
         let (cafe_lock, cafe_cvar) = &*contenedor_cafe;
-        if let Ok(mut state) = cafe_cvar.wait_while(cafe_lock.lock().unwrap(), |cont| {
+        if let Ok(mut state) = cafe_cvar.wait_while(cafe_lock.lock()?, |cont| {
             cont.en_uso || cont.cafe_molido < pedido.cafe
         }) {
             state.en_uso = true;
-            println!("[DEBUG] Pedido {} sirviendo cafe", id_pedido);
+            println!("[DEBUG] Pedido {} sirviendo cafe", pedido.id);
             thread::sleep(Duration::from_millis(u64::from(pedido.cafe) * TIEMPO_POR_UNIDAD));
             state.cafe_molido -= pedido.cafe;
             state.cafe_consumido += pedido.cafe;
             state.en_uso = false;
-            println!("[DEBUG] Pedido {} cafe completado", id_pedido);
+            println!("[DEBUG] Pedido {} cafe completado", pedido.id);
             cafe_cvar.notify_all();
         }
+        Ok(())
     }
 
-    fn servir_espuma(contenedor_espuma: Arc<(Mutex<ContenedorEspuma>, Condvar)>, pedido: &Pedido, id_pedido: usize) {
+    fn servir_espuma(contenedor_espuma: Arc<(Mutex<ContenedorEspuma>, Condvar)>, pedido: &Pedido) -> Result<(), CafeteriaError> {
         let (esp_lock, esp_cvar) = &*contenedor_espuma;
-        if let Ok(mut state) = esp_cvar.wait_while(esp_lock.lock().unwrap(), |cont| {
+        if let Ok(mut state) = esp_cvar.wait_while(esp_lock.lock()?, |cont| {
             cont.en_uso || cont.espuma < pedido.espuma
         }) {
             state.en_uso = true;
-            println!("[DEBUG] Pedido {} sirviendo espuma", id_pedido);
+            println!("[DEBUG] Pedido {} sirviendo espuma", pedido.id);
             thread::sleep(Duration::from_millis(u64::from(pedido.espuma) * TIEMPO_POR_UNIDAD));
             state.espuma -= pedido.espuma;
             state.espuma_consumida += pedido.espuma;
             state.en_uso = false;
-            println!("[DEBUG] Pedido {} espuma completada", id_pedido);
+            println!("[DEBUG] Pedido {} espuma completada", pedido.id);
             esp_cvar.notify_all();
         }
+        Ok(())
     }
 
     fn estadisticas(&self) -> JoinHandle<()> {

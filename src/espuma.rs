@@ -4,6 +4,7 @@ use std::time::Duration;
 use std::cmp::min;
 
 use crate::constantes::{E, L, TIEMPO_ESPUMA, MAX_CANTIDAD};
+use crate::error::CafeteriaError;
 
 pub struct ContenedorEspuma {
     /// Cantidad actual de espuma
@@ -41,10 +42,10 @@ impl Default for ContenedorEspuma {
     }
 }
 
-pub fn rellenar_expuma(contenedor: Arc<(Mutex<ContenedorEspuma>, Condvar)>) {
+pub fn rellenar_espuma(contenedor: Arc<(Mutex<ContenedorEspuma>, Condvar)>) -> Result<(), CafeteriaError> {
     let (espuma_lock, espuma_cvar) = &*contenedor;
     loop {
-        if let Ok(mut state) = espuma_cvar.wait_while(espuma_lock.lock().unwrap(), |cont| {
+        if let Ok(mut state) = espuma_cvar.wait_while(espuma_lock.lock()?, |cont| {
             (cont.en_uso || cont.espuma >= MAX_CANTIDAD) && !cont.fin
         }) {
             if state.fin {
@@ -58,12 +59,13 @@ pub fn rellenar_expuma(contenedor: Arc<(Mutex<ContenedorEspuma>, Condvar)>) {
             state.leche -= cantidad;
             state.leche_consumida += cantidad;
             if state.leche < E {
-                println!("[INFO] contenedor de leche por debajo del {}%. Reponiendo.", E * 100 / L);
+                println!("[INFO] Contenedor de leche por debajo del {}%. Reponiendo.", E * 100 / L);
                 state.leche = L;
             }
             state.en_uso = false;
             espuma_cvar.notify_one();
         }
     }
+    Ok(())
 }
 
