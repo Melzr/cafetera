@@ -1,14 +1,14 @@
 use std::fs::File;
-use std::io::{BufReader, BufRead};
+use std::io::{BufRead, BufReader};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
-use std::sync::{Condvar, Mutex, Arc};
 use std::time::Duration;
 
-use crate::constantes::{N, TIEMPO_POR_UNIDAD, TIEMPO_STATS, TIEMPO_PEDIDO};
+use crate::cafe::{rellenar_cafe, ContenedorCafe};
+use crate::constantes::{N, TIEMPO_PEDIDO, TIEMPO_POR_UNIDAD, TIEMPO_STATS};
 use crate::error::CafeteriaError;
+use crate::espuma::{rellenar_espuma, ContenedorEspuma};
 use crate::pedido::Pedido;
-use crate::cafe::{ContenedorCafe, rellenar_cafe};
-use crate::espuma::{ContenedorEspuma, rellenar_espuma};
 
 pub struct Cafetera {
     dispensadores: Arc<(Mutex<Vec<bool>>, Condvar)>,
@@ -25,20 +25,14 @@ impl Cafetera {
     pub fn new() -> Cafetera {
         Cafetera {
             dispensadores: Arc::new((Mutex::new(vec![true; N]), Condvar::new())),
-            cafe: Arc::new((
-                Mutex::new(ContenedorCafe::new()),
-                Condvar::new()
-            )),
-            espuma: Arc::new((
-                Mutex::new(ContenedorEspuma::new()),
-                Condvar::new()
-            )),
+            cafe: Arc::new((Mutex::new(ContenedorCafe::new()), Condvar::new())),
+            espuma: Arc::new((Mutex::new(ContenedorEspuma::new()), Condvar::new())),
             cant_pedidos: Arc::new(Mutex::new(0)),
         }
     }
 
     /// Lee el archivo de pedidos dado por el argumento ruta y los prepara.
-    /// 
+    ///
     /// # Errors
     /// * En caso de error al abrir el archivo, devuelve [`CafeteriaError::AperturaArchivo`].
     /// * En caso de error al leer el archivo, devuelve [`CafeteriaError::LecturaArchivo`].
@@ -46,9 +40,9 @@ impl Cafetera {
     pub fn realizar_pedidos(&self, ruta: &str) -> Result<(), CafeteriaError> {
         let file = File::open(ruta).map_err(|_| CafeteriaError::AperturaArchivo)?;
         let file = BufReader::new(file);
-        let mut pedidos_handles = Vec::new();   
-        let mut cafetera_handles = Vec::new();   
-   
+        let mut pedidos_handles = Vec::new();
+        let mut cafetera_handles = Vec::new();
+
         let cafe = self.cafe.clone();
         cafetera_handles.push(thread::spawn(move || {
             if rellenar_cafe(cafe).is_err() {
@@ -72,7 +66,7 @@ impl Cafetera {
                     let dispensador = self.obtener_dispensador(pedido.id)?;
                     pedidos_handles.push(self.realizar_pedido(pedido, dispensador));
                     thread::sleep(Duration::from_millis(TIEMPO_PEDIDO));
-                },
+                }
                 Err(e) => {
                     println!("[WARN] Error al procesar el pedido: {:?}", e);
                 }
@@ -102,16 +96,14 @@ impl Cafetera {
     }
 
     /// Obtiene un dispensador libre para el pedido.
-    /// 
+    ///
     /// # Errors
     /// * En caso de que el lock de los dispensadores se encuentre envenenado, devuelve [`CafeteriaError::LockEnvenenado`].
     fn obtener_dispensador(&self, pedido: usize) -> Result<usize, CafeteriaError> {
         let (lock, cvar) = &*(self.dispensadores);
         println!("[DEBUG] Pedido {} esperando dispensador", pedido);
         let mut num_disp = 0;
-        if let Ok(mut state) = cvar.wait_while(lock.lock()?, |disp| {
-            !disp.iter().any(|&x| x)
-        }) {
+        if let Ok(mut state) = cvar.wait_while(lock.lock()?, |disp| !disp.iter().any(|&x| x)) {
             for (i, disp) in state.iter_mut().enumerate() {
                 if *disp {
                     *disp = false;
@@ -134,15 +126,17 @@ impl Cafetera {
 
         thread::spawn(move || {
             println!("[DEBUG] Pedido {} sirviendo agua", pedido.id);
-            thread::sleep(Duration::from_millis(u64::from(pedido.agua) * TIEMPO_POR_UNIDAD));
-            
+            thread::sleep(Duration::from_millis(
+                u64::from(pedido.agua) * TIEMPO_POR_UNIDAD,
+            ));
+
             if Self::servir_cafe(cafe, &pedido).is_err() {
                 println!("[WARN] Pedido {} no pudo servir cafe", pedido.id);
             }
             if Self::servir_espuma(espuma, &pedido).is_err() {
                 println!("[WARN] Pedido {} no pudo servir espuma", pedido.id);
             }
-    
+
             println!("[INFO] Pedido {} completado!", pedido.id);
             let (disp_lock, disp_cvar) = &*dispensadores;
             if let Ok(mut state) = disp_lock.lock() {
@@ -156,17 +150,22 @@ impl Cafetera {
     }
 
     /// Sirve cafe al pedido recibido.
-    /// 
+    ///
     /// # Errors
     /// * En caso de que el lock de los dispensadores se encuentre envenenado, devuelve [`CafeteriaError::LockEnvenenado`].
-    fn servir_cafe(contenedor_cafe: Arc<(Mutex<ContenedorCafe>, Condvar)>, pedido: &Pedido) -> Result<(), CafeteriaError> {
+    fn servir_cafe(
+        contenedor_cafe: Arc<(Mutex<ContenedorCafe>, Condvar)>,
+        pedido: &Pedido,
+    ) -> Result<(), CafeteriaError> {
         let (cafe_lock, cafe_cvar) = &*contenedor_cafe;
         if let Ok(mut state) = cafe_cvar.wait_while(cafe_lock.lock()?, |cont| {
             cont.en_uso || cont.cafe_molido < pedido.cafe
         }) {
             state.en_uso = true;
             println!("[DEBUG] Pedido {} sirviendo cafe", pedido.id);
-            thread::sleep(Duration::from_millis(u64::from(pedido.cafe) * TIEMPO_POR_UNIDAD));
+            thread::sleep(Duration::from_millis(
+                u64::from(pedido.cafe) * TIEMPO_POR_UNIDAD,
+            ));
             state.cafe_molido -= pedido.cafe;
             state.cafe_consumido += pedido.cafe;
             state.en_uso = false;
@@ -177,17 +176,22 @@ impl Cafetera {
     }
 
     /// Sirve espuma al pedido recibido.
-    /// 
+    ///
     /// # Errors
     /// * En caso de que el lock de los dispensadores se encuentre envenenado, devuelve [`CafeteriaError::LockEnvenenado`].
-    fn servir_espuma(contenedor_espuma: Arc<(Mutex<ContenedorEspuma>, Condvar)>, pedido: &Pedido) -> Result<(), CafeteriaError> {
+    fn servir_espuma(
+        contenedor_espuma: Arc<(Mutex<ContenedorEspuma>, Condvar)>,
+        pedido: &Pedido,
+    ) -> Result<(), CafeteriaError> {
         let (esp_lock, esp_cvar) = &*contenedor_espuma;
         if let Ok(mut state) = esp_cvar.wait_while(esp_lock.lock()?, |cont| {
             cont.en_uso || cont.espuma < pedido.espuma
         }) {
             state.en_uso = true;
             println!("[DEBUG] Pedido {} sirviendo espuma", pedido.id);
-            thread::sleep(Duration::from_millis(u64::from(pedido.espuma) * TIEMPO_POR_UNIDAD));
+            thread::sleep(Duration::from_millis(
+                u64::from(pedido.espuma) * TIEMPO_POR_UNIDAD,
+            ));
             state.espuma -= pedido.espuma;
             state.espuma_consumida += pedido.espuma;
             state.en_uso = false;
@@ -205,8 +209,8 @@ impl Cafetera {
         let pedidos_lock = self.cant_pedidos.clone();
 
         thread::spawn(move || loop {
-            let (mut cant_cafe, mut cant_granos, mut cant_espuma, mut cant_leche) = (0, 0, 0, 0);    
-            let (mut cafe_cons, mut granos_cons, mut espuma_cons, mut leche_cons) = (0, 0, 0, 0);    
+            let (mut cant_cafe, mut cant_granos, mut cant_espuma, mut cant_leche) = (0, 0, 0, 0);
+            let (mut cafe_cons, mut granos_cons, mut espuma_cons, mut leche_cons) = (0, 0, 0, 0);
             let mut cant_pedidos = 0;
 
             if let Ok(cafe_contenedor) = cafe_lock.0.lock() {
@@ -225,23 +229,27 @@ impl Cafetera {
                 cant_pedidos = *pedidos;
             }
 
-            println!("[INFO] Estado contenedores: cafe {}, granos {}, espuma {}, leche {}", cant_cafe, cant_granos, cant_espuma, cant_leche);
-            println!("[INFO] Consumo total: cafe {}, granos {}, espuma {}, leche {}", cafe_cons, granos_cons, espuma_cons, leche_cons);
+            println!(
+                "[INFO] Estado contenedores: cafe {}, granos {}, espuma {}, leche {}",
+                cant_cafe, cant_granos, cant_espuma, cant_leche
+            );
+            println!(
+                "[INFO] Consumo total: cafe {}, granos {}, espuma {}, leche {}",
+                cafe_cons, granos_cons, espuma_cons, leche_cons
+            );
             println!("[INFO] Pedidos completados: {}", cant_pedidos);
-            
+
             if let Ok(contenedor_espuma) = espuma_lock.0.lock() {
                 if contenedor_espuma.fin {
                     break;
                 }
             } else {
-                println!("[ERROR] Debido a un error inesperado no se seguiran mostrando las estadisticas");   
+                println!("[ERROR] Debido a un error inesperado no se seguiran mostrando las estadisticas");
                 break;
             }
 
             thread::sleep(Duration::from_millis(TIEMPO_STATS));
         })
-
-
     }
 }
 

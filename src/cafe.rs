@@ -1,9 +1,9 @@
-use std::thread;
-use std::sync::{Condvar, Mutex, Arc};
-use std::time::Duration;
 use std::cmp::min;
+use std::sync::{Arc, Condvar, Mutex};
+use std::thread;
+use std::time::Duration;
 
-use crate::constantes::{C, G, TIEMPO_CAFE, MAX_CANTIDAD};
+use crate::constantes::{C, G, MAX_CANTIDAD, TIEMPO_CAFE};
 use crate::error::CafeteriaError;
 
 pub struct ContenedorCafe {
@@ -47,10 +47,12 @@ impl Default for ContenedorCafe {
 /// durante este tiempo no se podrá utilizar el dispensador de café.
 /// También se rellena el contenedor de granos cuando su cantidad sea menor a [`C`], esto es instantáneo.
 /// Finaliza cuando [`ContenedorCafe`].fin es true.
-/// 
+///
 /// # Errors
 /// * En caso de que el lock del contenedor se encuentre envenenado, devuelve [`CafeteriaError::LockEnvenenado`].
-pub fn rellenar_cafe(contenedor: Arc<(Mutex<ContenedorCafe>, Condvar)>) -> Result<(), CafeteriaError> {
+pub fn rellenar_cafe(
+    contenedor: Arc<(Mutex<ContenedorCafe>, Condvar)>,
+) -> Result<(), CafeteriaError> {
     let (cafe_lock, cafe_cvar) = &*contenedor;
     loop {
         if let Ok(mut state) = cafe_cvar.wait_while(cafe_lock.lock()?, |cont| {
@@ -67,7 +69,10 @@ pub fn rellenar_cafe(contenedor: Arc<(Mutex<ContenedorCafe>, Condvar)>) -> Resul
             state.granos -= cantidad;
             state.granos_consumidos += cantidad;
             if state.granos < C {
-                println!("[INFO] Contenedor de granos por debajo del {}%. Reponiendo.", C * 100 / G);
+                println!(
+                    "[INFO] Contenedor de granos por debajo del {}%. Reponiendo.",
+                    C * 100 / G
+                );
                 state.granos = G;
             }
             state.en_uso = false;

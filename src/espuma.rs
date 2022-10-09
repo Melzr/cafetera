@@ -1,9 +1,9 @@
-use std::thread;
-use std::sync::{Condvar, Mutex, Arc};
-use std::time::Duration;
 use std::cmp::min;
+use std::sync::{Arc, Condvar, Mutex};
+use std::thread;
+use std::time::Duration;
 
-use crate::constantes::{E, L, TIEMPO_ESPUMA, MAX_CANTIDAD};
+use crate::constantes::{E, L, MAX_CANTIDAD, TIEMPO_ESPUMA};
 use crate::error::CafeteriaError;
 
 pub struct ContenedorEspuma {
@@ -47,10 +47,12 @@ impl Default for ContenedorEspuma {
 /// durante este tiempo no se podrá utilizar el dispensador de espuma.
 /// También se rellena el contenedor de leche cuando su cantidad sea menor a [`E`], esto es instantáneo.
 /// Finaliza cuando [`ContenedorEspuma`].fin es true.
-/// 
+///
 /// # Errors
 /// * En caso de que el lock del contenedor se encuentre envenenado, devuelve [`CafeteriaError::LockEnvenenado`].
-pub fn rellenar_espuma(contenedor: Arc<(Mutex<ContenedorEspuma>, Condvar)>) -> Result<(), CafeteriaError> {
+pub fn rellenar_espuma(
+    contenedor: Arc<(Mutex<ContenedorEspuma>, Condvar)>,
+) -> Result<(), CafeteriaError> {
     let (espuma_lock, espuma_cvar) = &*contenedor;
     loop {
         if let Ok(mut state) = espuma_cvar.wait_while(espuma_lock.lock()?, |cont| {
@@ -67,7 +69,10 @@ pub fn rellenar_espuma(contenedor: Arc<(Mutex<ContenedorEspuma>, Condvar)>) -> R
             state.leche -= cantidad;
             state.leche_consumida += cantidad;
             if state.leche < E {
-                println!("[INFO] Contenedor de leche por debajo del {}%. Reponiendo.", E * 100 / L);
+                println!(
+                    "[INFO] Contenedor de leche por debajo del {}%. Reponiendo.",
+                    E * 100 / L
+                );
                 state.leche = L;
             }
             state.en_uso = false;
@@ -76,4 +81,3 @@ pub fn rellenar_espuma(contenedor: Arc<(Mutex<ContenedorEspuma>, Condvar)>) -> R
     }
     Ok(())
 }
-

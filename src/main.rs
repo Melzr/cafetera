@@ -1,5 +1,5 @@
-use cafeteria::error::CafeteriaError;
 use cafeteria::cafetera::Cafetera;
+use cafeteria::error::CafeteriaError;
 // use cafeteria::pedido::generate_file;
 
 fn main() -> Result<(), CafeteriaError> {
@@ -10,11 +10,10 @@ fn main() -> Result<(), CafeteriaError> {
             cafetera.realizar_pedidos(ruta)
 
             // generate_file(ruta)
-        },
+        }
         None => {
             println!("No se especificó la ruta del archivo de pedidos");
             Err(CafeteriaError::ArgumentosInvalidos)
         }
     }
-
 }
