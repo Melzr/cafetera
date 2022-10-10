@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use cafeteria::cafetera::Cafetera;
-    use cafeteria::constantes::{C, G, E, L};
+    use cafeteria::constantes::{C, E, G, L};
     use cafeteria::error::CafeteriaError;
 
     #[test]
