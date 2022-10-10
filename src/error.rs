@@ -1,5 +1,5 @@
 /// Errores posibles del programa.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum CafeteriaError {
     /// No se recibió la ruta al archivo con pedidos.
     ArgumentosInvalidos,

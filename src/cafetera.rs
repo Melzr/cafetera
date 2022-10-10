@@ -13,11 +13,11 @@ use crate::pedido::Pedido;
 pub struct Cafetera {
     dispensadores: Arc<(Mutex<Vec<bool>>, Condvar)>,
     /// Contenedor de cafe y granos
-    cafe: Arc<(Mutex<ContenedorCafe>, Condvar)>,
+    pub cafe: Arc<(Mutex<ContenedorCafe>, Condvar)>,
     /// Contenedor de espuma y leche
-    espuma: Arc<(Mutex<ContenedorEspuma>, Condvar)>,
+    pub espuma: Arc<(Mutex<ContenedorEspuma>, Condvar)>,
     /// Cantidad total de pedidos completados
-    cant_pedidos: Arc<Mutex<u32>>,
+    pub cant_pedidos: Arc<Mutex<u32>>,
 }
 
 impl Cafetera {

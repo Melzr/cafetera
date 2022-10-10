@@ -5,7 +5,7 @@ use std::io::Write;
 use crate::constantes::{MAX_CANTIDAD, MIN_CANTIDAD};
 use crate::error::CafeteriaError;
 
-const CANT_PEDIDOS: usize = 100;
+const CANT_PEDIDOS: usize = 15;
 
 /// Información del pedido de un cliente.
 ///
