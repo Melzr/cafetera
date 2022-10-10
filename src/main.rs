@@ -1,15 +1,21 @@
 use cafeteria::cafetera::Cafetera;
 use cafeteria::error::CafeteriaError;
-// use cafeteria::pedido::generate_file;
+use cafeteria::pedido::generate_file;
+
+const FILE_COMMAND: &str = "-f";
 
 fn main() -> Result<(), CafeteriaError> {
     let args: Vec<String> = std::env::args().collect();
     match args.get(1) {
-        Some(ruta) => {
-            let cafetera = Cafetera::new();
-            cafetera.realizar_pedidos(ruta)
-
-            // generate_file(ruta)
+        Some(arg) => {
+            if arg == FILE_COMMAND {
+                let filename = args.get(2).ok_or(CafeteriaError::ArgumentosInvalidos)?;
+                let n = args.get(3);
+                generate_file(filename, n)
+            } else {
+                let cafetera = Cafetera::new();
+                cafetera.realizar_pedidos(arg)
+            }
         }
         None => {
             println!("No se especificó la ruta del archivo de pedidos");

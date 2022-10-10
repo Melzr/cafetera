@@ -86,9 +86,12 @@ impl Pedido {
     }
 }
 
-/// Genera un archivo de pedidos con [`CANT_PEDIDOS`] pedidos aleatorios en la ruta dada.
-pub fn generate_file(ruta: &str) -> Result<(), CafeteriaError> {
-    let pedidos: Vec<Pedido> = (1..=CANT_PEDIDOS).map(Pedido::new_random).collect();
+/// Genera un archivo de pedidos con n o [`CANT_PEDIDOS`] pedidos aleatorios en la ruta dada.
+pub fn generate_file(ruta: &str, n: Option<&String>) -> Result<(), CafeteriaError> {
+    let n = n
+        .map(|n| n.parse::<usize>().unwrap_or(CANT_PEDIDOS))
+        .unwrap_or(CANT_PEDIDOS);
+    let pedidos: Vec<Pedido> = (1..=n).map(Pedido::new_random).collect();
 
     let mut file = File::create(ruta).map_err(|_| CafeteriaError::CreacionArchivo)?;
     for pedido in pedidos {

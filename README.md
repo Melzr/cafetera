@@ -2,6 +2,8 @@
 
 ### Correr el programa
 
+##### Realizar pedidos:
+
 ```
 cargo run <archivo>
 ```
@@ -12,6 +14,20 @@ Por ejemplo:
 
 ```
 cargo run pedidos.txt
+```
+
+##### Generar un archivo con pedidos aleatorios:
+
+```
+cargo run -- -f <archivo> <cantidad_pedidos>
+```
+
+donde `<archivo>` es la ruta del archivo a generar y `<cantidad_pedidos>` un número entero.
+
+Por ejemplo:
+
+```
+cargo run -- -f pedidos.txt 50
 ```
 
 ### Generar documentación
