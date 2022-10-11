@@ -2,7 +2,7 @@
 
 ### Correr el programa
 
-##### Realizar pedidos:
+##### Correr cafetera
 
 ```
 cargo run <archivo>
@@ -16,7 +16,7 @@ Por ejemplo:
 cargo run pedidos.txt
 ```
 
-##### Generar un archivo con pedidos aleatorios:
+##### Generar un archivo con pedidos aleatorios
 
 ```
 cargo run -- -f <archivo> <cantidad_pedidos>
@@ -30,7 +30,13 @@ Por ejemplo:
 cargo run -- -f pedidos.txt 50
 ```
 
-### Generar documentación
+##### Correr tests
+
+```
+cargo test
+```
+
+##### Generar documentación
 
 ```
 cargo doc --document-private-items --open
