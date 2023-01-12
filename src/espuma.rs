@@ -11,9 +11,6 @@ pub struct ContenedorEspuma {
     pub espuma: u32,
     /// Cantidad actual de leche
     pub leche: u32,
-    /// true si el contenedor se encuentra en uso.
-    /// Solo puede ser usado por un dispensador a la vez
-    pub en_uso: bool,
     /// true si no quedan pedidos por realizar
     pub fin: bool,
     /// Cantidad total de espuma consumida
@@ -28,7 +25,6 @@ impl ContenedorEspuma {
         ContenedorEspuma {
             espuma: 0,
             leche: L,
-            en_uso: false,
             fin: false,
             espuma_consumida: 0,
             leche_consumida: 0,
@@ -56,12 +52,11 @@ pub fn rellenar_espuma(
     let (espuma_lock, espuma_cvar) = &*contenedor;
     loop {
         if let Ok(mut state) = espuma_cvar.wait_while(espuma_lock.lock()?, |cont| {
-            (cont.en_uso || cont.espuma >= MAX_CANTIDAD) && !cont.fin
+            cont.espuma >= MAX_CANTIDAD && !cont.fin
         }) {
             if state.fin {
                 break;
             }
-            state.en_uso = true;
             println!("[DEBUG] Reponiendo espuma");
             thread::sleep(Duration::from_millis(TIEMPO_ESPUMA));
             let cantidad = min(E - state.espuma, state.leche);
@@ -75,7 +70,6 @@ pub fn rellenar_espuma(
                 );
                 state.leche = L;
             }
-            state.en_uso = false;
             espuma_cvar.notify_one();
         }
     }

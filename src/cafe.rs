@@ -11,9 +11,6 @@ pub struct ContenedorCafe {
     pub cafe_molido: u32,
     /// Cantidad actual de granos de cafe
     pub granos: u32,
-    /// true si el contenedor se encuentra en uso.
-    /// Solo puede ser usado por un dispensador a la vez
-    pub en_uso: bool,
     /// true si no quedan pedidos por realizar
     pub fin: bool,
     /// Cantidad total de cafe molido consumido
@@ -28,7 +25,6 @@ impl ContenedorCafe {
         ContenedorCafe {
             cafe_molido: 0,
             granos: G,
-            en_uso: false,
             fin: false,
             cafe_consumido: 0,
             granos_consumidos: 0,
@@ -56,12 +52,11 @@ pub fn rellenar_cafe(
     let (cafe_lock, cafe_cvar) = &*contenedor;
     loop {
         if let Ok(mut state) = cafe_cvar.wait_while(cafe_lock.lock()?, |cont| {
-            (cont.en_uso || cont.cafe_molido >= MAX_CANTIDAD) && !cont.fin
+            cont.cafe_molido >= MAX_CANTIDAD && !cont.fin
         }) {
             if state.fin {
                 break;
             }
-            state.en_uso = true;
             println!("[DEBUG] Reponiendo cafe molido");
             thread::sleep(Duration::from_millis(TIEMPO_CAFE));
             let cantidad = min(C - state.cafe_molido, state.granos);
@@ -75,7 +70,6 @@ pub fn rellenar_cafe(
                 );
                 state.granos = G;
             }
-            state.en_uso = false;
             cafe_cvar.notify_one();
         }
     }

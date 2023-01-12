@@ -159,16 +159,14 @@ impl Cafetera {
     ) -> Result<(), CafeteriaError> {
         let (cafe_lock, cafe_cvar) = &*contenedor_cafe;
         if let Ok(mut state) = cafe_cvar.wait_while(cafe_lock.lock()?, |cont| {
-            cont.en_uso || cont.cafe_molido < pedido.cafe
+            cont.cafe_molido < pedido.cafe
         }) {
-            state.en_uso = true;
             println!("[DEBUG] Pedido {} sirviendo cafe", pedido.id);
             thread::sleep(Duration::from_millis(
                 u64::from(pedido.cafe) * TIEMPO_POR_UNIDAD,
             ));
             state.cafe_molido -= pedido.cafe;
             state.cafe_consumido += pedido.cafe;
-            state.en_uso = false;
             println!("[DEBUG] Pedido {} cafe completado", pedido.id);
             cafe_cvar.notify_all();
         }
@@ -185,16 +183,14 @@ impl Cafetera {
     ) -> Result<(), CafeteriaError> {
         let (esp_lock, esp_cvar) = &*contenedor_espuma;
         if let Ok(mut state) = esp_cvar.wait_while(esp_lock.lock()?, |cont| {
-            cont.en_uso || cont.espuma < pedido.espuma
+            cont.espuma < pedido.espuma
         }) {
-            state.en_uso = true;
             println!("[DEBUG] Pedido {} sirviendo espuma", pedido.id);
             thread::sleep(Duration::from_millis(
                 u64::from(pedido.espuma) * TIEMPO_POR_UNIDAD,
             ));
             state.espuma -= pedido.espuma;
             state.espuma_consumida += pedido.espuma;
-            state.en_uso = false;
             println!("[DEBUG] Pedido {} espuma completada", pedido.id);
             esp_cvar.notify_all();
         }
