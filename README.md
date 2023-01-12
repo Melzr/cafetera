@@ -1,8 +1,9 @@
 # TP1: Internet of Coffee
+### Técnicas de Programación Concurrente - 2C2022
 
-### Correr el programa
+## Correr el programa
 
-##### Correr cafetera
+### Correr cafetera
 
 ```
 cargo run <archivo>
@@ -16,7 +17,7 @@ Por ejemplo:
 cargo run pedidos.txt
 ```
 
-##### Generar un archivo con pedidos aleatorios
+### Generar archivo con pedidos aleatorios
 
 ```
 cargo run -- -f <archivo> <cantidad_pedidos>
@@ -30,19 +31,19 @@ Por ejemplo:
 cargo run -- -f pedidos.txt 50
 ```
 
-##### Correr tests
+### Correr tests
 
 ```
 cargo test
 ```
 
-##### Generar documentación
+### Generar documentación
 
 ```
 cargo doc --document-private-items --open
 ```
 
-### Pedidos
+## Pedidos
 
 Los pedidos a realizar se representan con un id y las cantidades de agua, café y espuma a utilizar.
 Se simula su llegada mediante la lectura de un archivo de texto, donde cada línea representa un pedido siguiendo el siguiente formato:
@@ -62,7 +63,7 @@ Se simula la llegada de clientes mediante un sleep entre cada uno de estos pedid
 
 En caso de error al procesar un pedido del archivo, se imprimirá una advertencia y se continuará intentando leer pedidos del archivo.
 
-### Cafetera
+## Cafetera
 
 La cafetera consta de un contenedor de café molido, un contenedor de granos de café, un contenedor de espuma y un contenedor de leche, además de N dispensadores. Los dispensadores de café molido y espuma están inicialmente vacíos, mientras que los contenedores de granos y leche inicialmente contienen la totalidad de su capacidad.
 
